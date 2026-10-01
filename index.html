@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map View: a fibre build schedule as a 3D map | Lattice Grid</title>
+<meta name="description"
+  content="A synthetic fibre build schedule in Colchester, Essex, as a live 3D map: premises, build zones and duct routes, bound to a Lattice Grid table through the mapview module. Filter, select or group the grid and the map follows.">
+<link rel="icon" href="data:,">
+<!--
+  The grid's stylesheet and ESM build, from jsDelivr. Every address names the
+  exact release, 1.84.0, so the page can never quietly pick up a different
+  build than the one it was checked against.
+-->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@toclocoinc/lattice-grid@1.84.0/lattice-grid.min.css?v=20261002a">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/deck.gl@9.1.0/dist.min.js"></script>
+<style>
+  body { font: 14px system-ui, sans-serif; margin: 1.25rem; color: var(--lattice-foreground, #14171a);
+         background: var(--lattice-background, #fff); }
+  h1 { font-size: 1.1rem; margin: 0 0 .25rem; }
+  p { margin: 0 0 .75rem; color: var(--lattice-foreground-muted, #5b6570); max-width: 90ch; }
+  .bar { display: flex; gap: .75rem; align-items: center; margin: 0 0 .75rem; flex-wrap: wrap; }
+  #schedule { height: 560px; }
+  output { font-variant-numeric: tabular-nums; }
+  .attribution { font-size: 12px; color: var(--lattice-foreground-muted, #5b6570); margin-top: 1rem; }
+</style>
+</head>
+<body>
+<script>
+  if (location.protocol === 'file:') {
+    document.documentElement.innerHTML = '<body style="font:16px system-ui;margin:4rem auto;max-width:38rem">'
+      + '<h1>Serve this demo over HTTP</h1><p>Run a static server from the repository root, e.g. '
+      + '<code>npx serve</code>, and open <code>/index.html</code>.</p></body>';
+  }
+</script>
+<h1>Map View: a fibre build schedule in Colchester, as a 3D map</h1>
+<p>A synthetic schedule: about 2,000 premises (columns, as tall as the premises they pass), 20 build zones and 30 duct
+routes with flow, coloured by status, over OpenFreeMap with 3D buildings. Filter, search or group the grid and the map
+follows; select a row and the map flies to it; click a column and the grid selects and scrolls to its row.</p>
+<div class="bar">
+  <label>Status <select id="status"><option value="">all</option><option>planned</option><option>build</option><option>live</option></select></label>
+  <label>Search <input id="search" type="search" placeholder="P0042, Z07, Duct 3"></label>
+  <label><input id="group" type="checkbox"> Group by zone status</label>
+  <output id="drawn" aria-live="polite"></output>
+</div>
+<div id="schedule"></div>
+<p class="attribution">
+  Synthetic data, seeded (no real address, premises or route). Basemap:
+  <a href="https://openfreemap.org">OpenFreeMap</a> Positron, <a href="https://www.openmaptiles.org/">&copy; OpenMapTiles</a>,
+  data <a href="https://www.openstreetmap.org/copyright">&copy; OpenStreetMap contributors</a>. Drawing:
+  <a href="https://deck.gl">deck.gl</a> and <a href="https://maplibre.org">MapLibre GL JS</a>. Built with
+  <a href="https://www.latticegrid.dev">Lattice Grid</a> 1.84.0 (<code>modules/mapview</code>).
+  <a href="https://github.com/toclocoinc/lattice-grid-demo-map-view">Source</a>.
+</p>
+<script type="module">
+import { createGrid, setLicence } from 'https://cdn.jsdelivr.net/npm/@toclocoinc/lattice-grid@1.84.0/lattice-grid.esm.min.js?v=20261002a';
+import { createMapView } from 'https://cdn.jsdelivr.net/npm/@toclocoinc/lattice-grid@1.84.0/modules/mapview.esm.min.js?v=20261002a';
+import { buildSchedule } from './map-view-data.js';
+
+// Bound to toclocoinc.github.io; does nothing anywhere else. localhost never needs a key.
+setLicence('LG1.eyJ2IjoxLCJwIjoibGF0dGljZS1ncmlkIiwidCI6IlRPQ0xPQ08gSW5jIC0gcHVibGljIGRlbW9zIiwiZSI6IjIwMzAtMDEtMDEiLCJkIjpbInRvY2xvY29pbmMuZ2l0aHViLmlvIl19.9De42ua3aCGpiMB6EVRP7Tv-upUlDI-0T07rlSPzvCrsqg8t4YJi7SRnStEpAg48uzmcG7il1fR_TfwkUE7iCA');
+
+const rows = buildSchedule(1639);
+const grid = createGrid(document.querySelector('#schedule'), {
+  rowKey: 'id',
+  selection: 'single',
+  columns: [
+    { field: 'id', layout: { width: 80 } },
+    { field: 'kind', layout: { width: 90 } },
+    { field: 'name', layout: { width: 170 } },
+    { field: 'status', layout: { width: 90 } },
+    { field: 'premisesPassed', title: 'Premises passed', type: 'number' },
+    { field: 'week', title: 'Build week', type: 'number' },
+    { field: 'geom', layout: { hidden: true } },
+  ],
+  rows,
+});
+
+const map = createMapView(grid, {
+  mode: 'split',
+  geometry: { geojson: 'geom' },
+  layer: 'column',
+  elevation: 'premisesPassed',
+  elevationScale: 4,
+  radius: 7,
+  width: 3,
+  color: { field: 'status', map: { live: '#2e7d32', build: '#f9a825', planned: '#90a4ae' } },
+  flow: { speed: 0.3, trail: 0.35 },
+  buildings: true,
+  tooltip: ['name', 'status', 'premisesPassed'],
+});
+
+const drawn = document.querySelector('#drawn');
+map.on('draw', ({ provenance: p }) => {
+  drawn.textContent = `${p.drawn.toLocaleString()} on the map (${p.layers.column || 0} premises, `
+    + `${p.layers.polygon || 0} zones, ${p.layers.path || 0} ducts)`;
+});
+drawn.textContent = `${map.provenance().drawn.toLocaleString()} on the map`;
+
+document.querySelector('#status').addEventListener('change', (e) => {
+  const value = e.target.value;
+  grid.filters.set(value ? { col: 'status', op: 'eq', value } : null);
+});
+document.querySelector('#search').addEventListener('input', (e) => grid.filters.quick(e.target.value));
+document.querySelector('#group').addEventListener('change', (e) => {
+  if (e.target.checked) grid.columns.group('status'); else grid.columns.group([]);
+});
+
+window.__mapViewDemo = { grid, map };
+</script>
+</body>
+</html>
