@@ -77,20 +77,31 @@ const rows = [
   ...net.nodes.map((n) => ({ id: n.id, section: 'Cabinets and splices', kind: n.kind, routeId: null, onRoute: n.routeId, lat: n.lat, lon: n.lon, street: n.street, status: n.status })),
 ];
 
+// Route-level columns read once, on the route's heading. The total is the first vertex's value for a route group and
+// nothing for the cabinets group; the cell renderer leaves a route's vertex rows blank (a cabinet row keeps its own).
+const routeLevel = {
+  groupTotal: (values, { row, grid }) => (grid.rows.leavesOf(row.key)[0]?.data.kind === 'route' ? values[0] : ''),
+  cell: { render: (p) => {
+    const span = document.createElement('span');
+    span.textContent = p.row.group || p.data.kind !== 'route' ? p.text : '';
+    return span;
+  } },
+};
+
 const grid = createGrid(document.querySelector('#network'), {
   rowKey: 'id',
   selection: 'multiple',
   columns: [
     { field: 'section', title: 'Route', layout: { width: 100 } },
-    { field: 'street', title: 'Street', groupTotal: 'first', layout: { width: 125 } },
-    { field: 'status', title: 'Status', groupTotal: 'first', layout: { width: 75 } },
-    { field: 'lengthM', title: 'Length m', type: 'number', groupTotal: 'first', layout: { width: 85 } },
-    { field: 'premisesPassed', title: 'Premises', type: 'number', groupTotal: 'first', layout: { width: 75 } },
-    { field: 'buildDate', title: 'Built', type: 'dateString', groupTotal: 'first', layout: { width: 90 } },
+    { field: 'seq', title: 'No.', type: 'number', layout: { width: 45 } },
+    { field: 'street', title: 'Street', ...routeLevel, layout: { width: 98 } },
+    { field: 'status', title: 'Status', ...routeLevel, layout: { width: 70 } },
+    { field: 'lengthM', title: 'Length m', type: 'number', ...routeLevel, layout: { width: 80 } },
+    { field: 'premisesPassed', title: 'Premises', type: 'number', ...routeLevel, layout: { width: 72 } },
+    { field: 'buildDate', title: 'Built', type: 'dateString', ...routeLevel, layout: { width: 90 } },
     { field: 'kind', title: 'Kind', layout: { width: 80 } },
     { field: 'id', title: 'Row', layout: { width: 100 } },
     { field: 'onRoute', title: 'On route', layout: { width: 80 } },
-    { field: 'seq', title: 'Seq', type: 'number', layout: { width: 60 } },
     { field: 'routeId', layout: { hidden: true } },
     { field: 'type', title: 'Type', layout: { hidden: true } },
     { field: 'lat', type: 'number', layout: { hidden: true } },
